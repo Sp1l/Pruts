@@ -9,7 +9,6 @@ except:
 from pathlib import Path
 
 from parseArgs import parseArgs
-from ports import getNextcloudVersion, getPorts
 from nextcloudAPI import getApps
 
 def maxVersion(releases):
@@ -24,16 +23,18 @@ if __name__  == '__main__':
     args = parseArgs()
 
     if args.portsdir is None:
-        PORTSDIR = "/jails/porting/usr/ports"
+        DIR = args.nextclouddir
+        from installed import getNextcloudVersion, getPorts
     else:
-        PORTSDIR = args.portsdir
+        DIR = args.portsdir
+        from ports import getNextcloudVersion, getPorts
 
     if args.nextcloudVersion is None:
-        nextcloudVersion = getNextcloudVersion(PORTSDIR)
+        nextcloudVersion = getNextcloudVersion(DIR)
     else:
         nextcloudVersion = args.nextcloudVersion
 
-    ports = getPorts(PORTSDIR)
+    ports = getPorts(DIR)
 
     apps = getApps(nextcloudVersion, args)
 
