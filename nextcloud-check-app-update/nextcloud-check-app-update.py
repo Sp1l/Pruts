@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import re
 import json
@@ -27,7 +28,7 @@ def readETag(version):
     p = Path(f'./apps_{version}.etag')
     try:
         for line in p.read_text().splitlines():
-    	    etag = line
+            etag = line
         return etag
     except:
         return None
@@ -45,22 +46,31 @@ def writeJson(version, payload):
     p = Path(f'./apps_{version}.json')
     p.write_text(json.dumps(payload, indent=3))
 
-def getApps(version):
-    url = f'https://apps.nextcloud.com/api/v1/platform/{version}/apps.json'
-    etag = readETag(version)
-    headers = dict()
-    if not etag is None:
-        headers.update({'If-None-Match': etag})
-    req = requests.get(url, headers=headers)
+def getApps(version, nofetch):
+    if not nofetch:
+        url = f'https://apps.nextcloud.com/api/v1/platform/{version}/apps.json'
+        etag = readETag(version)
+        headers = dict()
+        if not etag is None:
+            headers.update({'If-None-Match': etag})
+        req = requests.get(url, headers=headers)
     
-    if req.status_code == 304:
-        payload = readJson(version)
+        if req.status_code == 304:
+            payload = readJson(version)
+            status = 'Cached'
+        else:
+            etag = req.headers['ETag'].strip('W/')
+            status = 'New'
+            payload = req.json()
+            writeETag(version, etag)
+            writeJson(version, payload)
     else:
-        etag = req.headers['ETag'].strip('W/')
-        print(f'New apps.json for {version}:', etag)
-        payload = req.json()
-        writeETag(version, etag)
-        writeJson(version, payload)
+        etag = readETag(version)
+        payload = readJson(version)
+        status = 'Loaded'
+
+    if not args.quiet:
+        print(f'{status} apps.json for {version}:', etag)
 
     apps = dict()
     for app in payload:
@@ -99,14 +109,29 @@ def getPorts():
         ports.append(port)
     return ports
 
-PORTSDIR = "/jails/porting/usr/ports"
+argparser = argparse.ArgumentParser(description='Check Nextcloud app versions against apps.nextcloud.com API')
+argparser.add_argument('--nextcloudVersion', metavar='version', type=str,
+                       help='Nextcloud version to check apps for, defaults to the version in the www/nextcloud port')
+argparser.add_argument('--portsdir', metavar='portsdir', type=str)
+argparser.add_argument('--nofetch', '-n', action='store_true',
+                       help='Do not fetch latest info from nextcloud API')
+argparser.add_argument('--quiet', '-q', action='store_true',
+                       help='Quiet output, only apps with new versions will be listed')
+args = argparser.parse_args()
 
-nextcloudVersion = getNextcloudVersion()
-#nextcloudVersion = '22.0.0'
+if args.portsdir is None:
+    PORTSDIR = "/jails/porting/usr/ports"
+else:
+    PORTSDIR = args.portsdir
+
+if args.nextcloudVersion is None:
+    nextcloudVersion = getNextcloudVersion()
+else:
+    nextcloudVersion = args.nextcloudVersion
 
 ports = getPorts()
 
-apps = getApps(nextcloudVersion)
+apps = getApps(nextcloudVersion, args.nofetch)
 p = Path('./apps.json')
 p.write_text(json.dumps(apps, indent=4))
 
@@ -130,7 +155,9 @@ for port in ports:
         else:
             uptodate += f'{portName}({port["version"]}) '
     else:
-        print(f'{portName} not available for {nextcloudVersion}')
+        if not args.quiet:
+            print(f'{portName} not available for {nextcloudVersion}')
 
-print('Up to date:', uptodate.strip(' '))
+if not args.quiet:
+    print('Up to date:', uptodate.strip(' '))
    
