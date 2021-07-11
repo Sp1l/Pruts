@@ -14,10 +14,11 @@ Check Nextcloud app versions against apps.nextcloud.com API
 
 optional arguments:
   -h, --help            show this help message and exit
-  --nextcloudVersion version
+  --nextcloudVersion VERSION
                         Nextcloud version to check apps for, defaults to the version in the www/nextcloud port
-  --portsdir            Path to the FreeBSD ports directory root
-  --nextclouddir        Path to the Nextcloud installation root
+  --portsdir DIRECTORY  Path to the FreeBSD ports directory root
+  --nextclouddir DIRECTORY
+                        Path to the Nextcloud installation root
   --nofetch, -n         Do not fetch latest info from nextcloud API
   --quiet, -q           Quiet output, only apps with new versions will be listed
 ```
