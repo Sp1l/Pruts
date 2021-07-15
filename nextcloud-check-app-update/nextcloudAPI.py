@@ -36,7 +36,8 @@ def getApps(version, args):
         url = f'https://apps.nextcloud.com/api/v1/platform/{version}/apps.json'
         etag = readETag(version)
         headers = dict()
-        if not etag is None:
+
+        if not (etag is None or args.fetch):
             headers.update({'If-None-Match': etag})
         req = requests.get(url, headers=headers)
     
@@ -55,7 +56,7 @@ def getApps(version, args):
         status = 'Loaded'
 
     if not args.quiet:
-        print(f'{status} apps.json for {version}:', etag)
+        print(f'{status} apps.json for Nextcloud {version}:', etag)
 
     apps = dict()
     for app in payload:
