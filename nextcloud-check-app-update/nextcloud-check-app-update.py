@@ -12,11 +12,13 @@ from parseArgs import parseArgs
 from nextcloudAPI import getApps
 
 def maxVersion(releases):
-    version = parse('0')
+    latest = parse('0')
     for release in releases:
-        if parse(release['version']) > version:
-            version = parse(release['version'])
-    return version
+        version = parse(release['version'])
+        if (( not version.is_prerelease and
+              version > latest )):
+            latest = version
+    return latest
 
 if __name__  == '__main__':
 
