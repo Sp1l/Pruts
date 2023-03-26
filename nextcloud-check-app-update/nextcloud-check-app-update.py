@@ -31,7 +31,6 @@ def max_version(releases):
 if __name__  == "__main__":
 
     args = parse_args()
-    print(args)
 
     if args.portsdir is None:
         root_dir = args.nextclouddir
