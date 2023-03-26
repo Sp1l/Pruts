@@ -20,11 +20,13 @@ def max_version(releases):
     Returns:
         str: packaging.version.Version
     """
-    version = parse("0")
+    latest = parse('0')
     for release in releases:
-        if parse(release["version"]) > version:
-            version = parse(release["version"])
-    return version
+        version = parse(release['version'])
+        if (( not version.is_prerelease and
+              version > latest )):
+            latest = version
+    return latest
 
 if __name__  == "__main__":
 
