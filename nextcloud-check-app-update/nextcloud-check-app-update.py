@@ -1,68 +1,75 @@
 #!/usr/bin/env python3
+"""Checks if nextcloud apps need updating using
+an installed nextcloud or FreeBSD ports tree"""
 
 try:
     from packaging.version import parse
-except:
-    print('Missing required "packaging" package from https://packaging.pypa.io')
+except ModuleNotFoundError:
+    print("Missing required \"packaging\" package from https://packaging.pypa.io")
     quit()
 
-from pathlib import Path
+from parse_args import parse_args
+from nextcloud_api import get_apps as get_api_apps
 
-from parseArgs import parseArgs
-from nextcloudAPI import getApps
+def max_version(releases):
+    """Get highest version number from iterable
 
-def maxVersion(releases):
-    latest = parse('0')
+    Args:
+        releases (iterable): version strings
+
+    Returns:
+        str: packaging.version.Version
+    """
+    version = parse("0")
     for release in releases:
-        version = parse(release['version'])
-        if (( not version.is_prerelease and
-              version > latest )):
-            latest = version
-    return latest
+        if parse(release["version"]) > version:
+            version = parse(release["version"])
+    return version
 
-if __name__  == '__main__':
+if __name__  == "__main__":
 
-    args = parseArgs()
+    args = parse_args()
+    print(args)
 
     if args.portsdir is None:
-        DIR = args.nextclouddir
-        from installed import getNextcloudVersion, getPorts
+        root_dir = args.nextclouddir
+        from installed import get_nextcloud_version
+        from installed import get_installed_apps as get_apps
     else:
-        DIR = args.portsdir
-        from ports import getNextcloudVersion, getPorts
+        root_dir = args.portsdir
+        from ports import get_nextcloud_version
+        from ports import get_ports_apps as get_apps
 
     if args.nextcloudVersion is None:
-        nextcloudVersion = getNextcloudVersion(DIR)
+        nextcloud_version = get_nextcloud_version(root_dir)
     else:
-        nextcloudVersion = args.nextcloudVersion
+        nextcloud_version = args.nextcloudVersion
 
-    ports = getPorts(DIR)
+    all_apps = get_api_apps(nextcloud_version, args)
 
-    apps = getApps(nextcloudVersion, args)
-
-    uptodate = ''
-    for port in ports:
-        portName = port['name']
-        if portName == 'nextcloud-spreed-signaling': continue
-        portVersion = parse(port['version'])
-
+    # pylint: disable=invalid-name
+    uptodate = str()
+    for app in get_apps(root_dir):
         # Use appname when detected in port (i.e. spreed vs. talk)
-        if 'appname' in port:
-            appName = port['appname']
+        if "appname" in app:
+            nextcloud_appname = app["appname"]
         else:
-            appName = port['name']
+            nextcloud_appname = app["name"]
+
+        if nextcloud_appname == "nextcloud-spreed-signaling":
+            continue
+        app_version = parse(app["version"])
 
         # Check Nextcloud app for this version
-        if appName in apps:
-            appVersion = maxVersion(apps[appName]['releases'])
-            if appVersion > portVersion:
-                print(f'{portName} new version {appVersion}')
+        if nextcloud_appname in all_apps:
+            latest_version = max_version(all_apps[nextcloud_appname]["releases"])
+            if latest_version > app_version:
+                print(f"{nextcloud_appname}: new version {latest_version}")
             else:
-                uptodate += f'{portName}({port["version"]}) '
+                uptodate += f"{app['name']}({app['version']}) "
         else:
             if not args.quiet:
-                print(f'{portName} not available for {nextcloudVersion}')
+                print(f"{app['name']} not available for {nextcloud_version}")
 
     if not args.quiet:
-        print('Up to date:', uptodate.strip(' '))
-   
+        print("Up to date:", uptodate.strip(" "))

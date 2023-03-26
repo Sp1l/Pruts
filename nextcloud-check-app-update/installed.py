@@ -1,36 +1,63 @@
+"""Extract apps information from a Nextcloud install"""
+
 import json
 import re
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-def getNextcloudVersion(NEXTCLOUDDIR):
-    p = Path(NEXTCLOUDDIR + '/version.php')
-    versionphp = p.read_text()
-    for line in versionphp.splitlines():
-        if re.match('^\$OC_VersionString',line):
-             return line.split('=')[1].strip(" ';")
+def get_nextcloud_version(nextcloud_dir):
+    """Extract Nextcloud version from installation
 
-def getShippedApps(NEXTCLOUDDIR):
-    with open(NEXTCLOUDDIR + '/core/shipped.json') as file:
+    Args:
+        nextcloud_dir (str): Root directory of Nextcloud installation
+
+    Returns:
+        str: Version number
+    """
+    version_php = Path(nextcloud_dir + "/version.php")
+    version_php = version_php.read_text(encoding="utf-8")
+    for line in version_php.splitlines():
+        if re.match(r"^\$OC_VersionString", line):
+            return line.split("=")[1].strip(" ';")
+
+def get_shipped_apps(nextcloud_dir):
+    """Extract apps bundled with the base Nextcloud installation
+
+    Args:
+        nextcloud_dir (str): Root directory of Nextcloud installation
+
+    Returns:
+        list: List of bundled apps
+    """
+    shipped_json = Path(nextcloud_dir + "/core/shipped.json")
+    with open(shipped_json, encoding="utf-8") as file:
         shipped = json.load(file)
-    return shipped['shippedApps']
+    return shipped["shippedApps"]
 
-def getPorts(NEXTCLOUDDIR):
-    p = Path(NEXTCLOUDDIR)
-    shippedApps = getShippedApps(NEXTCLOUDDIR)
+def get_installed_apps(nextcloud_dir):
+    """Extract installed apps from the Nextcloud installation
+
+    Args:
+        nextcloud_dir (str): Root directory of Nextcloud installation
+
+    Returns:
+        list: list of installed apps
+    """
+    path = Path(nextcloud_dir)
+    shipped_apps = get_shipped_apps(nextcloud_dir)
     ports = list()
-    for path in list(p.glob('apps*/*/appinfo/info.xml')):
+    for path in list(path.glob("apps*/*/appinfo/info.xml")):
         port = dict()
         tree = ET.parse(path)
         root = tree.getroot()
-        port['name'] = root.find('id').text
-        port['version'] = root.find('version').text
-        if port['name'] not in shippedApps:
+        port["name"] = root.find("id").text
+        port["version"] = root.find("version").text
+        if port["name"] not in shipped_apps:
             ports.append(port)
     return ports
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-#    print(getNextcloudVersion('/jails/nextcloud/usr/local/www/nextcloud') )
-    print(getPorts('/jails/nextcloud/usr/local/www/nextcloud'))
+#    print(getNextcloudVersion("/jails/nextcloud/usr/local/www/nextcloud") )
+    print(get_installed_apps("/jails/nextcloud/usr/local/www/nextcloud"))
