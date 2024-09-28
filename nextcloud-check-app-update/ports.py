@@ -1,8 +1,6 @@
 """Extract Nextcloud apps information from FreeBSD ports tree"""
-import os
-import re
 
-from pathlib import Path
+import re
 
 def get_nextcloud_version(ports_dir):
     """Extract Nextcloud version from installation
@@ -13,7 +11,8 @@ def get_nextcloud_version(ports_dir):
     Returns:
         str: Version number
     """
-    nextcloud_makefile = Path(ports_dir + "/www/nextcloud/Makefile")
+    nextcloud_makefile = ports_dir / "www/nextcloud/Makefile"
+
     nextcloud_makefile = nextcloud_makefile.read_text(encoding="utf-8")
     for line in nextcloud_makefile.splitlines():
         if re.match("^PORTVERSION=",line):
@@ -32,7 +31,7 @@ def clean_distname(distname):
         distname = distname.replace("${" + remove + "}","")
     return distname.strip("-_")
 
-def get_ports_apps(ports_dir: str) -> list:
+def get_ports_apps(ports_dir: bytes) -> list:
     """Get nextcloud apps from a FreeBSD ports tree
 
     Args:
@@ -41,7 +40,6 @@ def get_ports_apps(ports_dir: str) -> list:
     Returns:
         _type_: _description_
     """
-    ports_dir = Path(ports_dir)
     ports = list()
     for path in list(ports_dir.glob("*/nextcloud-*/Makefile")):
         makefile = path.read_text(encoding="utf-8")
@@ -58,6 +56,6 @@ def get_ports_apps(ports_dir: str) -> list:
                 distname = clean_distname(line.split("\t")[1])
                 if distname != "":
                     port["appname"] = distname
-        port["portdir"] = os.sep.join(str(path).split(os.sep)[:-1])
+        port["portdir"] = path.parent
         ports.append(port)
     return ports

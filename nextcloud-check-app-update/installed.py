@@ -15,7 +15,7 @@ def get_nextcloud_version(nextcloud_dir):
     Returns:
         str: Version number
     """
-    version_php = Path(nextcloud_dir + "/version.php")
+    version_php = nextcloud_dir / "version.php"
     version_php = version_php.read_text(encoding="utf-8")
     for line in version_php.splitlines():
         if re.match(r"^\$OC_VersionString", line):
@@ -30,7 +30,7 @@ def get_shipped_apps(nextcloud_dir):
     Returns:
         list: List of bundled apps
     """
-    shipped_json = Path(nextcloud_dir + "/core/shipped.json")
+    shipped_json = nextcloud_dir / "core/shipped.json"
     with open(shipped_json, encoding="utf-8") as file:
         shipped = json.load(file)
     return shipped["shippedApps"]

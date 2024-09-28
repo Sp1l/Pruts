@@ -1,6 +1,7 @@
 """Arguments parser for nextcloud-check-app-update"""
 
 import argparse
+from pathlib import Path
 
 def parse_args():
     """Arguments parser for nextcloud-check-app-update
@@ -13,16 +14,16 @@ def parse_args():
         description="Check Nextcloud app versions against apps.nextcloud.com API"
     )
 
-    argparser.add_argument("--nextcloudVersion", metavar="VERSION", type=str,
+    argparser.add_argument("--nextcloudVersion", metavar="VERSION",
         help="Nextcloud version to check apps for, " +
         "defaults to the version in the www/nextcloud port"
     )
 
     dirgroup = argparser.add_mutually_exclusive_group(required=True)
-    dirgroup.add_argument("--portsdir", type=str, metavar="DIRECTORY",
+    dirgroup.add_argument("--portsdir", type=Path, metavar="DIRECTORY",
         help="Path to the FreeBSD ports directory root"
     )
-    dirgroup.add_argument("--nextclouddir", type=str, metavar="DIRECTORY",
+    dirgroup.add_argument("--nextclouddir", type=Path, metavar="DIRECTORY",
         help="Path to the Nextcloud installation root"
     )
 
