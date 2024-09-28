@@ -1,5 +1,6 @@
 """Operations on certificate blobs and files"""
 
+import logging
 import re
 import subprocess
 
@@ -12,10 +13,13 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
+try:
+    # pkcs7 was added in 40.0.0
+    from cryptography.hazmat.primitives.serialization import pkcs7
+except ImportError:
+    pkcs7 = None
 
 from lib.zip import create_zip_blob, clean_name
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -64,21 +68,9 @@ def get_cert_detail(certificate: str|bytes) -> dict:
             precert: Precertificate status (boolean)
     """
 
-    if isinstance(certificate, memoryview):
-        certificate = certificate.tobytes()
-    elif isinstance(certificate, str):
-        certificate = certificate.encode()
+    cert = convert_to_x509cert(certificate)
 
-    try:
-        if re.search(
-            b"-----BEGIN CERTIFICATE-----\r?\n.+?\r?\n-----END CERTIFICATE-----",
-            certificate,
-            re.DOTALL
-        ) is not None:
-            cert = x509.load_pem_x509_certificate(certificate, default_backend())
-        else:
-            cert = x509.load_der_x509_certificate(certificate, default_backend())
-    except Exception:  # pylint: disable=broad-exception-caught
+    if not cert:
         logger.error("get_cert_detail: load cert failed")
         return None
 
@@ -164,31 +156,63 @@ def get_cert_detail(certificate: str|bytes) -> dict:
     return result
 
 
-def cert_to_pem(certificate: str|bytes|memoryview) -> str:
+def cert_to_bytes(cert: str|bytes|memoryview) -> bytes:
+    """Convert an input certificate to a bytes sequence
+
+    Args:
+        cert (str|bytes|memoryview|x509.Certificate): Certificate data or instance
+
+    Returns:
+        bytes: cert as PEM bytes
+    """
+    if isinstance(cert, bytes):
+        return cert
+    if isinstance(cert, memoryview):
+        return cert.tobytes()
+    if isinstance(cert, str):
+        return cert.encode()
+    if isinstance(cert, x509.Certificate):
+        return cert.public_bytes(serialization.Encoding.PEM)
+    logger.error("cert_to_bytes: Can't convert {cert} to bytes")
+    return None
+
+
+def convert_to_x509cert(certificate: str|bytes|memoryview) -> x509.Certificate:
+    """Convert input to an x509 Certificate object
+
+    Args:
+        certificate (str|bytes|memoryview): certificate representation
+
+    Returns:
+        x509.Certificate: Cryptography Certificate
+    """
+    certificate = cert_to_bytes(certificate)
+
+    try:
+        if CERT_PEM_REGEX.search(certificate) is None:
+            return x509.load_der_x509_certificate(certificate, default_backend())
+        return x509.load_pem_x509_certificate(certificate)
+    except ValueError:
+        logger.error("convert_to_x509cert: load cert failed")
+        return None
+
+
+def cert_to_pem(certificate: str|bytes|memoryview) -> bytes:
     """Convert memory view or DER encoded cert to PEM encoding
 
     Args:
         certificate (str|bytes|memoryview): certificate
 
     Returns:
-        str: PEM encoded certificate
+        bytes: PEM encoded certificate
     """
+    certificate = cert_to_bytes(certificate)
 
-    if isinstance(certificate, memoryview):
-        certificate = certificate.tobytes()
-
-    if isinstance(certificate, bytes):
-        search_re = b"-----BEGIN CERTIFICATE-----\r?\n.+?\r?\n-----END CERTIFICATE-----"
-    else:
-        search_re = "-----BEGIN CERTIFICATE-----\r?\n.+?\r?\n-----END CERTIFICATE-----"
-
-    if re.search(search_re, certificate, re.DOTALL) is None:
+    if CERT_PEM_REGEX.search(certificate) is None:
         certificate = x509.load_der_x509_certificate(certificate, default_backend())
         return certificate.public_bytes(serialization.Encoding.PEM)
-    if isinstance(certificate, bytes):
-        return certificate
-    else:
-        return certificate.encode()
+
+    return certificate
 
 
 def store_cert(cert_dir: str, fingerprint_sha1: str, cert: str|bytes|memoryview):
@@ -300,7 +324,7 @@ def split_fullchain(fullchain: str) -> list[dict]:
     result = []
     for certificate in split_pem(fullchain):
         cert = get_cert_detail(certificate)
-        cert["pem"] = certificate
+        cert["PEM"] = certificate
         result.append(cert)
 
     return result
@@ -315,20 +339,31 @@ def fullchain_to_p7b(fullchain: list[dict]) -> bytes:
     Returns:
         bytes: certificate chain in PKCS#7 format including the Root CA
     """
-    pemchain = NamedTemporaryFile("w+b")
-    for cert in fullchain:
-        if isinstance(cert["PEM"], str):
-            cert["PEM"] = cert["PEM"].encode()
-        pemchain.write(cert["PEM"])
+    if pkcs7:
+        # New method, works with cryptography >= 40.0.0
+        logger.debug("Using pkcs7 from cryptography")
+        certs = []
+        for cert in fullchain:
+            certs.append(convert_to_x509cert(cert["PEM"]))
 
-    p7b = subprocess.run(
-        ["openssl", "crl2pkcs7", "-nocrl", "-certfile", pemchain.name],
-        capture_output=True, check=True
-    )
-    if p7b.returncode != 0:
-        logger.error("External openssl crl2pkcs7 command returned an error")
+        return pkcs7.serialize_certificates(certs, serialization.Encoding.PEM)
 
-    return p7b.stdout
+    # Old method: call external openssl
+    logger.debug("Using openssl crs2pkcs7")
+    with NamedTemporaryFile("w+b") as pemchain:
+        for cert in fullchain:
+            if isinstance(cert["PEM"], str):
+                cert["PEM"] = cert["PEM"].encode()
+            pemchain.write(cert["PEM"])
+        p7b = subprocess.run(
+            ["openssl", "crl2pkcs7", "-nocrl", "-certfile", pemchain.name],
+            capture_output=True, check=True
+        )
+
+        if p7b.returncode != 0:
+            logger.error("External openssl crl2pkcs7 command returned an error")
+
+        return p7b.stdout
 
 
 # pylint: disable-next=dangerous-default-value
