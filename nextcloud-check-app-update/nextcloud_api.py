@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
 """Get latest apps from Nextcloud API"""
 
 import json
+
 try:
     import requests
 except ModuleNotFoundError:
@@ -10,7 +10,10 @@ except ModuleNotFoundError:
 
 from pathlib import Path
 
-def read_etag(version):
+NEXTCLOUD_API_URL = "https://apps.nextcloud.com/api/v1"
+TMP_PATH = Path("/tmp")
+
+def read_etag(version: str) -> str:
     """Read persisted etag from disk
 
     Args:
@@ -19,7 +22,7 @@ def read_etag(version):
     Returns:
         str: the ETag of the json file on disk
     """
-    apps_etag = Path(f'./apps_{version}.etag')
+    apps_etag = TMP_PATH / f"apps_{version}.etag"
     try:
         for line in apps_etag.read_text(encoding="utf-8").splitlines():
             etag = line
@@ -27,17 +30,17 @@ def read_etag(version):
     except OSError:
         return None
 
-def write_etag(version, etag) -> None:
+def write_etag(version: str, etag: str) -> None:
     """Persist etag to disk
 
     Args:
         version (str): Nextcloud version string
         etag (str): ETag from Nextcloud HTTP headers
     """
-    apps_etag = Path(f'./apps_{version}.etag')
+    apps_etag = TMP_PATH / f"apps_{version}.etag"
     apps_etag.write_text(etag, encoding="utf-8")
 
-def read_json(version):
+def read_json(version: str) -> dict:
     """Read persisted json from disk
 
     Args:
@@ -46,21 +49,21 @@ def read_json(version):
     Returns:
         dict: JSON dictionary
     """
-    apps_json = Path(f'./apps_{version}.json')
+    apps_json = TMP_PATH / f"apps_{version}.json"
     payload = apps_json.read_text(encoding="utf-8")
     return json.loads(payload)
 
-def write_json(version, payload) -> None:
+def write_json(version: str, payload: dict) -> None:
     """Persist JSON payload to disk
 
     Args:
         version (str): Nextcloud version string
         payload (dict): JSON dictionary
     """
-    apps_json = Path(f'./apps_{version}.json')
+    apps_json = TMP_PATH / "apps_{version}.json"
     apps_json.write_text(json.dumps(payload, indent=3), encoding="utf-8")
 
-def get_apps(version, args):
+def get_apps(version: str, args) -> dict:
     """Get latest apps versions from Nextcloud API
 
     Args:
@@ -71,19 +74,19 @@ def get_apps(version, args):
         dict: Dictionary of apps from Nextcloud API
     """
     if not args.nofetch:
-        url = f'https://apps.nextcloud.com/api/v1/platform/{version}/apps.json'
+        url = f'{NEXTCLOUD_API_URL}/platform/{version}/apps.json'
         etag = read_etag(version)
         headers = dict()
 
         if not (etag is None or args.fetch):
             headers.update({'If-None-Match': etag})
-        req = requests.get(url, headers=headers, timeout=5)
+        req = requests.get(url, headers=headers, timeout=15)
 
         if req.status_code == 304:
             payload = read_json(version)
             status = 'Cached'
         else:
-            etag = req.headers['ETag'].strip('W/')
+            etag = req.headers.get('etag').strip('W/')
             status = 'New'
             payload = req.json()
             write_etag(version, etag)
@@ -93,10 +96,14 @@ def get_apps(version, args):
         payload = read_json(version)
         status = 'Loaded'
 
-    if not args.quiet:
+    if not args.quiet: 
         print(f'{status} apps.json for Nextcloud {version}:', etag)
 
     apps = dict()
     for app in payload:
-        apps.update({app["id"]: app})
+        latest = None
+        releases = []
+        for release in app["releases"]:
+            releases.append(release["version"])
+        apps.update({app["id"]: {"releases": releases}})
     return apps
