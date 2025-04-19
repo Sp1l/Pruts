@@ -2,11 +2,13 @@
 
 import re
 
-def get_nextcloud_version(ports_dir):
+from pathlib import Path
+
+def get_nextcloud_version(ports_dir: Path) -> str:
     """Extract Nextcloud version from installation
 
     Args:
-        ports_dir (str): FreeBSD PORTSDIR root
+        ports_dir (Path): FreeBSD PORTSDIR root
 
     Returns:
         str: Version number
@@ -18,7 +20,7 @@ def get_nextcloud_version(ports_dir):
         if re.match("^PORTVERSION=",line):
             return line.split("\t")[1]
 
-def clean_distname(distname):
+def clean_distname(distname: str) -> str:
     """Remove unwanted elements from a string
 
     Args:
@@ -31,14 +33,14 @@ def clean_distname(distname):
         distname = distname.replace("${" + remove + "}","")
     return distname.strip("-_")
 
-def get_ports_apps(ports_dir: bytes) -> list:
+def get_ports_apps(ports_dir: Path) -> list:
     """Get nextcloud apps from a FreeBSD ports tree
 
     Args:
-        PORTSDIR (_type_): _description_
+        ports_dir (Path): FreeBSD PORTSDIR root
 
     Returns:
-        _type_: _description_
+        list: {"name", "version", "version_prefix", "appname"}
     """
     ports = list()
     for path in list(ports_dir.glob("*/nextcloud-*/Makefile")):
@@ -47,13 +49,13 @@ def get_ports_apps(ports_dir: bytes) -> list:
         distname = None
         for line in makefile.splitlines():
             if re.match("^PORTNAME=",line):
-                port["name"] = line.split("\t")[1]
+                port["name"] = line.split("=")[1].strip()
             if re.match("^(PORT|DIST)VERSION=",line):
-                port["version"] = line.split("\t")[1]
+                port["version"] = line.split("=")[1].strip()
             if re.match("^DISTVERSIONPREFIX=",line):
-                port["versionprefix"] = line.split("\t")[1]
+                port["versionprefix"] = line.split("=")[1].strip()
             if re.match("^DISTNAME=",line):
-                distname = clean_distname(line.split("\t")[1])
+                distname = clean_distname(line.split("=")[1].strip())
                 if distname != "":
                     port["appname"] = distname
         port["portdir"] = path.parent
