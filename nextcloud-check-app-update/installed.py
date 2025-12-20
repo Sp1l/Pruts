@@ -1,12 +1,11 @@
 """Extract apps information from a Nextcloud install"""
 
 import json
-import re
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-def get_nextcloud_version(nextcloud_dir):
+def get_installed_nextcloud_version(nextcloud_dir: Path) -> dict:
     """Extract Nextcloud version from installation
 
     Args:
@@ -15,11 +14,18 @@ def get_nextcloud_version(nextcloud_dir):
     Returns:
         str: Version number
     """
-    version_php = nextcloud_dir / "version.php"
-    version_php = version_php.read_text(encoding="utf-8")
-    for line in version_php.splitlines():
-        if re.match(r"^\$OC_VersionString", line):
-            return line.split("=")[1].strip(" ';")
+    version = {}
+    with (nextcloud_dir / "version.php").open(encoding="utf-8") as f:
+        for line in f:
+            if line[:3] in "$OC_":
+                continue
+            parts = line[4:].split("=")
+            key = parts[0].strip(" ';")
+            value = parts[1].strip(" ';")
+            if key == "VersionCanBeUpgradedFrom":
+                continue
+            version[key] = value
+    return version
 
 def get_shipped_apps(nextcloud_dir):
     """Extract apps bundled with the base Nextcloud installation
@@ -57,7 +63,3 @@ def get_installed_apps(nextcloud_dir):
             ports.append(port)
     return ports
 
-if __name__ == "__main__":
-
-#    print(getNextcloudVersion("/jails/nextcloud/usr/local/www/nextcloud") )
-    print(get_installed_apps("/jails/nextcloud/usr/local/www/nextcloud"))

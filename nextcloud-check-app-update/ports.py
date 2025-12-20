@@ -1,10 +1,13 @@
 """Extract Nextcloud apps information from FreeBSD ports tree"""
 
+import logging
 import re
 
 from pathlib import Path
 
-def get_nextcloud_version(ports_dir: Path) -> str:
+logger = logging.getLogger(__name__)
+
+def get_ports_nextcloud_version(ports_dir: Path) -> dict:
     """Extract Nextcloud version from installation
 
     Args:
@@ -18,7 +21,7 @@ def get_nextcloud_version(ports_dir: Path) -> str:
     nextcloud_makefile = nextcloud_makefile.read_text(encoding="utf-8")
     for line in nextcloud_makefile.splitlines():
         if re.match("^PORTVERSION=",line):
-            return line.split("\t")[1]
+            return {"VersionString": line.split("\t")[1]}
 
 def clean_distname(distname: str) -> str:
     """Remove unwanted elements from a string
@@ -58,6 +61,9 @@ def get_ports_apps(ports_dir: Path) -> list:
                 distname = clean_distname(line.split("=")[1].strip())
                 if distname != "":
                     port["appname"] = distname
+        if port["name"] == "nextcloud-spreed-signaling":
+            # Not a Nextcloud PHP App
+            continue
         port["portdir"] = path.parent
         ports.append(port)
     return ports

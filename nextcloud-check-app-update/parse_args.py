@@ -11,12 +11,12 @@ def parse_args():
     """
 
     argparser = argparse.ArgumentParser(
-        description="Check Nextcloud app versions against apps.nextcloud.com API"
+        description="Check Nextcloud and Apps for new versions"
     )
 
     argparser.add_argument("--nextcloudVersion", metavar="VERSION",
-        help="Nextcloud version to check apps for, " +
-        "defaults to the version in the www/nextcloud port"
+        help="Nextcloud version to check apps for " 
+        "(default: uses version from Nextcloud or Ports dir)"
     )
 
     dirgroup = argparser.add_mutually_exclusive_group(required=True)
@@ -35,8 +35,35 @@ def parse_args():
         help="Do not fetch latest info from nextcloud API"
     )
 
-    argparser.add_argument("--quiet", "-q", action="store_true",
-        help="Quiet output, only apps with new versions will be listed"
+    verbositygroup = argparser.add_argument_group(
+        "Verbosity (default: info)"
+    ).add_mutually_exclusive_group()
+    verbositygroup.add_argument("--quiet", "-q", action="store_true",
+        help="Quiet output, only warnings, errors and apps with new versions will be listed"
     )
+    verbositygroup.add_argument("--verbose", "-v", action="store_true",
+        help="Verbose (debug) output")
 
-    return argparser.parse_args()
+    scopegroup = argparser.add_argument_group("Check core, apps or both (default: both)")
+    scopegroup.add_argument("--core", action="store_true",
+        help="Check updates for Nextcloud core only.")
+    scopegroup.add_argument("--apps", action="store_true",
+        help="Check updates for apps only.")
+
+    args = argparser.parse_args()
+
+    if not args.core and not args.apps:
+        args.core = True
+        args.apps = True
+
+    if not args.fetch and not args.nofetch:
+        fetch = None
+    elif args.fetch:
+        fetch = True
+    else:
+        fetch = False
+
+    args.fetch = fetch
+    del args.nofetch
+
+    return args
