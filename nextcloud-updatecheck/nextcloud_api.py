@@ -157,7 +157,7 @@ def get_nextcloud_apps(version: str, fetch: bool | None) -> dict:
     if status == "Cached":
         logger.debug("get_nextcloud_apps: Using cached apps.json for Nextcloud %s", version)
     else:
-        logger.info("get_nextcloud_apps: New apps.json for Nextcloud %s", version)
+        logger.debug("get_nextcloud_apps: New apps.json for Nextcloud %s", version)
 
     # Process content
     apps = {}

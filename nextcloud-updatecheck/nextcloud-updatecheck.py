@@ -46,7 +46,7 @@ if __name__ == "__main__":
         patch, latest = get_nextcloud_core(nextcloud_version, args.fetch)
 
         if nextcloud_version != patch:
-            logger.info("Nextcloud patch update from %s to %s", nextcloud_version, patch)
+            logger.warning("Nextcloud patch update from %s to %s", nextcloud_version, patch)
         if patch != latest:
             logger.info("Nextcloud upgrade from %s to %s", nextcloud_version, latest)
 
@@ -74,7 +74,7 @@ if __name__ == "__main__":
             #        if nextcloud_appname in all_app:
             latest_version = max_version(nextcloud_app["releases"])
             if latest_version > app_version:
-                logger.info("App '%s': new version %s", app["name"], latest_version)
+                logger.warning("App '%s': new version %s", app["name"], latest_version)
             else:
                 logger.debug(
                     "check_apps: App '%s': version %s is up to date", app["name"], app["version"]
